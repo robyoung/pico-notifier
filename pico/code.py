@@ -58,6 +58,7 @@ while True:
     pressed = read_button_states(0, 16)
     for button, keyset in keysets.items():
         if pressed[button] == 1:
+            print('LOG: execute keyset for button {}'.format(button))
             notifier.execute_keyset(keyset, kbd, layout, time)
 
     time.sleep(0.1)

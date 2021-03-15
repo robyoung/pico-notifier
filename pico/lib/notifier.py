@@ -18,6 +18,9 @@ def set_led(args, pixels):
         except ValueError as e:
             raise ValueError('invalid brightness: {}'.format(e))
 
+    if button < 0 or button > len(pixels) - 1:
+        raise ValueError('button number out of range: {}'.format(button))
+
     pixels[button] = pixel_args
 
 
@@ -66,7 +69,7 @@ def execute_keyset(keyset, kbd, layout, time):
 
 def handle_command(runtime, pixels, keysets, Keycode):
     if runtime.serial_bytes_available:
-        value = input()
+        value = input().strip()
         parts = value.split(':', 1)
 
         command = parts[0].upper()

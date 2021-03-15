@@ -1,1 +1,5 @@
 /pico/lib/adafruit*
+/venv
+/.hypothesis
+__pycache__
+!/.gitignore
