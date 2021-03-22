@@ -1,41 +1,23 @@
-def set_led(args, pixels):
-    if len(args) < 4:
-        raise ValueError('not enoug args: {}'.format(args))
-
-    try:
-        button = int(args[0])
-    except ValueError as e:
-        raise ValueError('invalid button number: {}'.format(e))
-
-    try:
-        pixel_args = tuple([int(colour) for colour in args[1:4]])
-    except ValueError as e:
-        raise ValueError('invalid colour: {}'.format(e))
-
-    if len(args) > 4:
-        try:
-            pixel_args = pixel_args + (float(args[4]),)
-        except ValueError as e:
-            raise ValueError('invalid brightness: {}'.format(e))
-
-    if button < 0 or button > len(pixels) - 1:
-        raise ValueError('button number out of range: {}'.format(button))
-
-    pixels[button] = pixel_args
+from os import pardir
 
 
-def set_key(args, keysets, Keycode):
-    if len(args) < 2:
-        raise ValueError('not enough args: {}'.format(args))
+COMMAND_IDENTIFY = 'IDENTIFY'
+COMMAND_SET_LED = 'SET LED'
+COMMAND_SET_KEY = 'SET KEY'
 
-    try:
-        button = int(args[0])
-    except ValueError as e:
-        raise ValueError('invalid button number: {}'.format(e))
 
-    keyset = [parse_keycmd(arg, Keycode) for arg in args[1:]]
+def set_led(pixels, buttons, rgb):
+    button_max = len(pixels) - 1
 
-    keysets[button] = tuple(keyset)
+    for button in buttons:
+        if button < 0 or button > button_max:
+            raise ValueError(f'button number must be positive int less than {button_max}')
+        pixels[button] = rgb
+
+
+def set_key(keysets, buttons, keycmds):
+    for button in buttons:
+        keysets[button] = keycmds
 
 
 def parse_keycmd(keycmd, Keycode):
@@ -66,28 +48,70 @@ def execute_keyset(keyset, kbd, layout, time):
             kbd.send(*value)
         elif name == 'w':
             layout.write(value)
+        elif name == 'l':
+            print('LOG: set leds key command')
+            pass
+
+
+def parse_command(command, Keycode):
+    parts = command.split(':', 1)
+    command_id = parts[0].upper()
+    raw_args = parts[1].split(',')
+
+    try:
+        if command_id == COMMAND_IDENTIFY:
+            return (command_id, tuple([]))
+        elif command_id == COMMAND_SET_LED:
+            if len(raw_args) != 2:
+                raise ValueError('expected 2 arguments')
+
+            buttons = [int(button) for button in raw_args[0].split('/')]
+            rgb = parse_rgb(raw_args[-1])
+
+            return command_id, (buttons, rgb)
+        elif command_id == COMMAND_SET_KEY:
+            if len(raw_args) != 2:
+                raise ValueError('expected 2 arguments')
+
+            buttons = [int(button) for button in raw_args[0].split('/')]
+            key_cmds = [parse_keycmd(key_cmd, Keycode) for key_cmd in raw_args[1].split('/')]
+
+            return command_id, (buttons, key_cmds)
+        else:
+            raise ValueError('unknown command')
+    except ValueError as e:
+        raise ValueError(f'Failed to parse command ({e}) {command}')
+
+
+def parse_rgb(value):
+    parts = value.split('*')
+    try:
+        if len(parts) in (3, 4):
+            rgb = tuple([int(part) for part in parts[:3]])
+            if len(parts) == 3:
+                return rgb
+            else:
+                return rgb + (float(parts[3]),)
+        raise ValueError
+    except ValueError as e:
+        raise ValueError(f'Invalid RGB value {value} ({e})')
+
 
 def handle_command(runtime, pixels, keysets, Keycode):
     if runtime.serial_bytes_available:
         value = input().strip()
-        parts = value.split(':', 1)
-
-        command = parts[0].upper()
-        if len(parts) > 1:
-            args = [arg.strip() for arg in parts[1].split(',')]
-        else:
-            args = []
 
         try:
-            if command == 'IDENTIFY':
+            command, args = parse_command(value, Keycode)
+            if command == COMMAND_IDENTIFY:
                 print('Notifier/0.1')
                 return
-            elif command == 'SET LED':
-                set_led(args, pixels)
-            elif command == 'SET KEY':
-                set_key(args, keysets, Keycode)
+            elif command == COMMAND_SET_LED:
+                set_led(pixels, *args)
+            elif command == COMMAND_SET_KEY:
+                set_key(keysets, *args)
             else:
-                raise ValueError('unkown command {}'.format(command))
+                raise ValueError('cannot be here')
             print('OK')
         except ValueError as e:
             print('ERROR: {}'.format(e))
