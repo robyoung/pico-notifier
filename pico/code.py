@@ -22,7 +22,9 @@ cs.value = 0
 
 # Set up APA102 pixels
 num_pixels = 16
-pixels = adafruit_dotstar.DotStar(board.GP18, board.GP19, num_pixels, brightness=0.1, auto_write=True)
+pixels = adafruit_dotstar.DotStar(
+    board.GP18, board.GP19, num_pixels, brightness=0.1, auto_write=True
+)
 
 # Set up I2C for IO expander (addr: 0x20)
 i2c = busio.I2C(board.GP5, board.GP4)
@@ -58,7 +60,7 @@ while True:
     pressed = read_button_states(0, 16)
     for button, keyset in keysets.items():
         if pressed[button] == 1:
-            print('LOG: execute keyset for button {}'.format(button))
-            notifier.execute_keyset(keyset, kbd, layout, time)
+            print("LOG: execute keyset for button {}".format(button))
+            notifier.execute_keyset(kbd, layout, time, pixels, keyset)
 
     time.sleep(0.1)
