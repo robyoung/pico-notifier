@@ -1,3 +1,8 @@
+try:
+    from adafruit_binascii import unhexlify
+except ImportError:
+    from binascii import unhexlify
+
 COMMAND_IDENTIFY = "IDENTIFY"
 COMMAND_SET_LED = "SET LED"
 COMMAND_SET_KEY = "SET KEY"
@@ -34,7 +39,7 @@ def parse_keycmd(keycmd, Keycode, buttons):
         except AttributeError as e:
             raise ValueError("invalid keycode {}".format(e))
     elif name == "w":
-        return name, value
+        return name, unhexlify(value).decode('utf8')
     elif name == "l":
         return name, (buttons, parse_rgb(value))
     else:
