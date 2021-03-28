@@ -2,6 +2,7 @@ import asyncio
 from contextlib import contextmanager
 import time
 from typing import Tuple, Optional, List, Union
+from binascii import hexlify
 
 import serial
 
@@ -17,6 +18,7 @@ GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 
 YELLOW = (255, 255, 0)
+ORANGE = (255, 100, 0)
 MAGENTA = (255, 0, 255)
 CYAN = (0, 255, 255)
 
@@ -32,7 +34,8 @@ class Key:
 
     @staticmethod
     def write(s: str) -> str:
-        return f'w{s}'
+        hexdata = hexlify(s.encode('utf8')).decode('utf8')
+        return f'w{hexdata}'
 
     @staticmethod
     def leds(colour: Colour, brightness: Optional[float] = None) -> str:

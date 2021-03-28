@@ -11,6 +11,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
+from . import pico
+
 
 _log = logging.getLogger(__name__)
 
@@ -26,6 +28,13 @@ POLL_EVENTS_EVERY = 60 * 10
 class Event:
     reminder: timedelta
     event: Mapping
+
+    @property
+    def colour(self):
+        if self.reminder == timedelta(0):
+            return pico.RED
+        else:
+            return pico.ORANGE
 
 
 async def send_events(queue: asyncio.Queue):
