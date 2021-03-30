@@ -1,15 +1,14 @@
 import asyncio
-from datetime import timedelta
 import sys
+
+from loguru import logger
 
 sys.path.append("./host")
 
 from host import gcal, pico, github
 
-# TODO: Retrieve next calendar event.
-# - If 5 minute reminder set top row yellow.
-# - If 0 minute reminder set top row red.
-# - If any button is pressed clear all
+logger.remove()
+logger.add(sys.stderr, level="INFO")
 
 
 async def handle_event(client, event):
@@ -25,6 +24,7 @@ async def handle_event(client, event):
         await client.set_key(button, event.key_cmds)
 
 
+@logger.catch
 async def main():
     queue = asyncio.Queue()
     asyncio.create_task(gcal.send_events(queue))
@@ -51,11 +51,9 @@ async def main():
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=10.0)
             except asyncio.TimeoutError:
-                print('No new event')
+                logger.debug('No new event')
             else:
                 await handle_event(client, event)
-
-
 
 
 if __name__ == '__main__':

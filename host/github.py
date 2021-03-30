@@ -1,18 +1,18 @@
 import asyncio
-import json
 import os
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Mapping, Any, Optional
-import logging
+from collections import defaultdict
+
+from loguru import logger
 
 import aiohttp
+from aiohttp.client_exceptions import ClientResponseError
 
 from . import pico
 
 BASE_URL = "https://api.github.com"
-
-_log = logging.getLogger(__name__)
 
 
 async def search_pulls(session, is_open: bool):
@@ -117,6 +117,10 @@ class Event:
                 pico.Key.key('ENTER'),
             ]
 
+    @staticmethod
+    def done(offset: int) -> "Event":
+        return Event(Pull("", PullState.DONE), offset)
+
 
 async def resolve_open_pull(session, result: Mapping[str, Any]) -> Optional[Pull]:
     raw_pull = await get_raw_pull(session, result)
@@ -161,6 +165,7 @@ async def get_open_pulls(session) -> list[Pull]:
 
 
 async def resolve_closed_pull(result: Mapping[str, Any]) -> Optional[Pull]:
+    # TODO
     return None
 
 
@@ -190,44 +195,43 @@ def get_headers():
 async def send_events(queue: asyncio.Queue):
     POLL_EVERY = 30
 
-    pull_offsets = {}
-
+    MAX_SENT = 0
     async with aiohttp.ClientSession(headers=get_headers()) as session:
         while True:
-            _log.debug("get pulls")
-            pulls = await get_pulls(session)
+            try:
+                logger.debug("get pulls")
+                pulls = await get_pulls(session)
 
-            # handle DONE
-            for pull in pulls:
-                if pull.state != PullState.DONE:
-                    continue
-                if (offset := pull_offsets.get(pull.url)) is not None:
+                # handle DONE
+                for pull in pulls:
+                    if pull.state != PullState.DONE:
+                        continue
+                    logger.debug(f"done {pull.url}")
+
+                # handle not DONE
+                offset = 0
+                sent = defaultdict(int)
+                for pull in pulls:
+                    sent[pull.state] += 1
+                    if pull.state == PullState.DONE:
+                        continue
                     event = Event(pull=pull, offset=offset)
+                    logger.debug("send update event")
                     await queue.put(event)
-                    _log.debug("send done event")
-                    del pull_offsets[pull.url]
+                    offset += 1
+                    if offset > MAX_SENT:
+                        MAX_SENT = offset
+                logger.info("sent {event_details}", event_details=", ".join([f"{num} {state} events" for state, num in sent.items()]))
+                current_max = offset
+                while offset < MAX_SENT:
+                    await queue.put(Event.done(offset))
+                    offset += 1
 
-            # handle not DONE
-            for pull in pulls:
-                if pull.state == PullState.DONE:
-                    continue
-                if pull.url not in pull_offsets:
-                    pull_offsets[pull.url] = min(set(range(8)) - set(pull_offsets.values()))
-                offset = pull_offsets[pull.url]
-                event = Event(pull=pull, offset=offset)
-                _log.debug("send update event")
-                await queue.put(event)
-            
-            await asyncio.sleep(POLL_EVERY)
-
-
-async def play(session):
-    results = await search_open_pulls(session)
-    pull = await get_pull(session, results["items"][0])
-    print(pull)
-    reviews = await get_reviews(session, pull)
-    statuses = await get_statuses(session, pull)
-    print(json.dumps(statuses))
+                MAX_SENT = current_max
+            except ClientResponseError as e:
+                logger.exception(e)
+            finally:
+                await asyncio.sleep(POLL_EVERY)
 
 
 async def main():

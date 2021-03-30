@@ -23,6 +23,9 @@ CALENDAR_LIST_PATH = "secrets/calendars.json"
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 POLL_EVENTS_EVERY = 60 * 10
 
+TIME_DELTA_NOW = timedelta(0)
+TIME_DELTA_SOON = timedelta(minutes=5)
+
 
 @dataclass
 class Event:
@@ -31,7 +34,7 @@ class Event:
 
     @property
     def colour(self):
-        if self.reminder == timedelta(0):
+        if self.reminder == TIME_DELTA_NOW:
             return pico.RED
         else:
             return pico.ORANGE
@@ -80,7 +83,7 @@ async def wait_for_next_event(events):
 
 
 def get_next_event(events) -> Tuple[datetime, timedelta, Any]:
-    reminders = [timedelta(minutes=5), timedelta(seconds=0)]
+    reminders = [TIME_DELTA_SOON, TIME_DELTA_NOW]
     max_reminder = max(reminders)
     now = datetime.now(timezone.utc)
     next_so_far = None
